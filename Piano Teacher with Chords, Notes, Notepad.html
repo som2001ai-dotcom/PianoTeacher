@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>MIDI Piano Teacher – Rude</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080810;--bg2:#0d0d1a;
+  --green:#3de8a0;--purple:#7070ff;--gold:#f0c040;--coral:#ff6b8a;
+  --bar-h:52px;
+}
+html,body{
+  width:100%;height:100%;
+  background:var(--bg);color:#fff;
+  font-family:'DM Mono',monospace;
+  overflow:hidden;
+  -webkit-tap-highlight-color:transparent;
+}
+
+/* ── TOP BAR ── */
+#topbar{
+  position:fixed;top:0;left:0;right:0;
+  height:var(--bar-h);
+  background:rgba(8,8,20,0.97);
+  border-bottom:1px solid rgba(112,112,255,0.25);
+  display:flex;align-items:center;gap:7px;
+  padding:0 10px;z-index:200;
+  overflow:hidden;
+}
+.logo{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:17px;letter-spacing:2px;
+  color:var(--gold);white-space:nowrap;flex-shrink:0;
+}
+.sep{width:1px;height:26px;background:rgba(255,255,255,0.1);flex-shrink:0}
+
+#uploadBtn{
+  background:rgba(112,112,255,0.15);
+  border:1px solid rgba(112,112,255,0.4);
+  color:var(--purple);
+  font-family:'DM Mono',monospace;
+  font-size:10px;letter-spacing:1px;
+  padding:5px 9px;cursor:pointer;
+  border-radius:4px;white-space:nowrap;
+  flex-shrink:0;transition:all 0.2s;
+}
+#uploadBtn:active{background:rgba(112,112,255,0.3);color:#fff}
+#fileInput{display:none}
+
+.ctrl-btn{
+  background:none;
+  border:1px solid rgba(255,255,255,0.18);
+  color:rgba(255,255,255,0.7);
+  width:32px;height:32px;border-radius:50%;
+  cursor:pointer;font-size:12px;
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.15s;flex-shrink:0;
+}
+.ctrl-btn:active,.ctrl-btn.active{border-color:var(--green);color:var(--green);background:rgba(61,232,160,0.1)}
+
+#progressWrap{flex:1;display:flex;align-items:center;gap:6px;min-width:0}
+#timeLabel{font-size:9px;color:rgba(255,255,255,0.4);white-space:nowrap;flex-shrink:0}
+#progressBar{
+  flex:1;height:4px;background:rgba(255,255,255,0.1);
+  border-radius:2px;cursor:pointer;min-width:30px;
+}
+#progressFill{
+  height:100%;border-radius:2px;
+  background:linear-gradient(90deg,var(--purple),var(--green));
+  width:0%;transition:width 0.1s linear;pointer-events:none;
+}
+
+.speed-wrap{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.speed-wrap label{font-size:9px;color:rgba(255,255,255,0.35);letter-spacing:1px}
+#speedSlider{width:55px;accent-color:var(--gold);cursor:pointer}
+#speedLabel{font-size:10px;color:var(--gold);width:34px}
+
+/* ── MAIN CONTENT ── */
+#mainContent{
+  position:fixed;
+  top:var(--bar-h);left:0;right:0;bottom:0;
+  display:flex;flex-direction:column;
+}
+
+/* ── KARAOKE SECTION (split) ── */
+#karaokeSection{
+  height:50%;background:var(--bg);
+  display:flex;flex-direction:row;
+  position:relative;overflow:hidden;
+}
+
+/* LEFT: Chord panel */
+#chordPanel{
+  width:28%;min-width:110px;max-width:200px;
+  background:rgba(6,6,18,0.95);
+  border-right:1px solid rgba(112,112,255,0.2);
+  display:flex;flex-direction:column;
+  overflow:hidden;flex-shrink:0;
+  position:relative;
+}
+#chordPanelLabel{
+  font-size:7px;letter-spacing:2px;color:rgba(255,100,138,0.6);
+  text-align:center;padding:5px 0 3px;flex-shrink:0;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+}
+#chordDisplay{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:8px 6px;gap:6px;
+  position:relative;
+}
+/* Chord name big */
+#chordName{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(22px,5vw,38px);
+  letter-spacing:3px;
+  color:var(--coral);
+  text-shadow:0 0 20px rgba(255,107,138,0.7),0 0 40px rgba(255,107,138,0.3);
+  text-align:center;line-height:1;
+  transition:all 0.15s;
+}
+#chordName.no-chord{color:rgba(255,255,255,0.1);font-size:14px;text-shadow:none;}
+/* Mini chord keyboard */
+#chordKeys{
+  display:flex;flex-direction:row;align-items:flex-start;
+  position:relative;height:48px;
+  justify-content:center;
+}
+.ck-white{
+  width:14px;height:44px;
+  background:rgba(255,255,255,0.07);
+  border:1px solid rgba(255,255,255,0.12);
+  border-top:none;
+  border-radius:0 0 2px 2px;
+  position:relative;display:inline-block;
+  margin-right:1px;transition:background 0.1s;
+}
+.ck-white.ck-active{
+  background:linear-gradient(180deg,var(--coral),#cc3355)!important;
+  box-shadow:0 0 8px rgba(255,107,138,0.6);
+}
+.ck-black{
+  width:9px;height:27px;
+  background:rgba(0,0,0,0.7);
+  border:1px solid rgba(255,255,255,0.08);
+  border-top:none;
+  border-radius:0 0 2px 2px;
+  position:absolute;top:0;z-index:2;
+  transition:background 0.1s;
+}
+.ck-black.ck-active{
+  background:linear-gradient(180deg,#cc3355,#991133)!important;
+  box-shadow:0 0 6px rgba(255,107,138,0.7);
+}
+/* Chord note labels */
+#chordNoteLabels{
+  font-size:8px;color:rgba(255,100,138,0.7);
+  letter-spacing:1px;text-align:center;
+  line-height:1.4;
+}
+/* Upcoming chord */
+#nextChordWrap{
+  border-top:1px solid rgba(255,255,255,0.05);
+  padding:5px 6px;flex-shrink:0;text-align:center;
+}
+#nextChordLabel{font-size:7px;color:rgba(255,255,255,0.2);letter-spacing:1px;margin-bottom:2px;}
+#nextChordName{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:16px;letter-spacing:2px;
+  color:rgba(255,107,138,0.4);
+}
+
+/* RIGHT: Note/melody panel */
+#notePanel{
+  flex:1;
+  display:flex;flex-direction:column;
+  justify-content:center;align-items:center;
+  padding:10px 14px;
+  position:relative;overflow:hidden;
+}
+#notePanel::before{
+  content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.04) 2px,rgba(0,0,0,0.04) 4px);
+  pointer-events:none;
+}
+#notePanel::after{
+  content:'';position:absolute;
+  width:70%;height:60%;border-radius:50%;
+  background:radial-gradient(ellipse,rgba(61,232,160,0.04) 0%,transparent 70%);
+  top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;
+}
+#notePanelLabel{
+  position:absolute;top:5px;left:8px;
+  font-size:7px;letter-spacing:2px;color:rgba(255,255,255,0.12);
+}
+#karaokeContainer{
+  width:100%;max-width:700px;
+  display:flex;flex-direction:column;gap:8px;
+  position:relative;z-index:1;
+}
+.kline{
+  display:flex;flex-wrap:wrap;
+  gap:5px 9px;min-height:40px;
+  align-items:center;transition:opacity 0.4s;
+}
+.kline.prev{opacity:0.18}
+.kline.curr{opacity:1}
+.kline.next{opacity:0.55}
+.note-chip{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(20px,5vw,34px);
+  letter-spacing:2px;transition:all 0.12s;line-height:1;
+}
+.kline.curr .note-chip.played{font-size:clamp(16px,3.5vw,28px);color:rgba(255,255,255,0.06)}
+.kline.curr .note-chip.active{
+  font-size:clamp(30px,8vw,52px);
+  color:var(--green);
+  text-shadow:0 0 15px rgba(61,232,160,0.9),0 0 35px rgba(61,232,160,0.5),0 0 60px rgba(61,232,160,0.2);
+  display:inline-block;
+}
+.kline.curr .note-chip.next-note{font-size:clamp(24px,6vw,40px);color:var(--purple);text-shadow:0 0 12px rgba(112,112,255,0.6)}
+.kline.curr .note-chip.upcoming{font-size:clamp(20px,5vw,32px);color:rgba(140,160,220,0.5)}
+.kline.prev .note-chip,.kline.next .note-chip{font-size:clamp(18px,4vw,30px);color:rgba(200,210,255,0.65)}
+#noSongMsg{
+  text-align:center;
+  font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(16px,5vw,24px);letter-spacing:4px;color:rgba(255,255,255,0.1);
+}
+#noSongMsg span{display:block;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;margin-top:6px;color:rgba(255,255,255,0.07)}
+
+/* ── PIANO ── */
+#pianoSection{
+  flex:1;background:var(--bg2);
+  border-top:1px solid rgba(255,255,255,0.06);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+#pianoLabel{
+  font-size:8px;letter-spacing:2px;color:rgba(255,255,255,0.18);
+  text-align:center;padding:4px 0 2px;flex-shrink:0;
+}
+#pianoScroll{
+  flex:1;overflow-x:auto;overflow-y:hidden;
+  display:flex;align-items:flex-start;justify-content:center;
+  padding:4px 14px 6px;
+  -webkit-overflow-scrolling:touch;
+}
+#pianoScroll::-webkit-scrollbar{height:3px}
+#pianoScroll::-webkit-scrollbar-track{background:rgba(255,255,255,0.04)}
+#pianoScroll::-webkit-scrollbar-thumb{background:rgba(112,112,255,0.3);border-radius:2px}
+#keyboard{position:relative;flex-shrink:0}
+
+.white-key{
+  position:relative;display:inline-block;
+  background:linear-gradient(180deg,#1a1a2e 0%,#161625 100%);
+  border:1px solid rgba(255,255,255,0.08);border-top:none;
+  border-bottom-left-radius:3px;border-bottom-right-radius:3px;
+  cursor:pointer;transition:background 0.08s;vertical-align:top;
+}
+.white-key.active-green{background:linear-gradient(180deg,#3de8a0,#1fbe78)!important;box-shadow:0 0 10px rgba(61,232,160,0.5)}
+.white-key.active-purple{background:linear-gradient(180deg,#8888ff,#5555cc)!important;box-shadow:0 0 10px rgba(112,112,255,0.5)}
+.white-key.active-coral{background:linear-gradient(180deg,#ff6b8a,#cc3355)!important;box-shadow:0 0 10px rgba(255,107,138,0.5)}
+.white-key.used{background:linear-gradient(180deg,#1c1c30,#181828)}
+.white-key.unused{background:linear-gradient(180deg,#0f0f1c,#0c0c18);opacity:0.4}
+.black-key{
+  position:absolute;top:0;
+  background:linear-gradient(180deg,#0a0a14,#080810);
+  border:1px solid rgba(255,255,255,0.06);border-top:none;
+  border-bottom-left-radius:2px;border-bottom-right-radius:2px;
+  cursor:pointer;z-index:2;transition:background 0.08s;
+}
+.black-key.active-green{background:linear-gradient(180deg,#2bc878,#1a9958)!important;box-shadow:0 0 8px rgba(61,232,160,0.6)}
+.black-key.active-purple{background:linear-gradient(180deg,#6060cc,#4040aa)!important;box-shadow:0 0 8px rgba(112,112,255,0.6)}
+.black-key.active-coral{background:linear-gradient(180deg,#cc3355,#991133)!important;box-shadow:0 0 8px rgba(255,107,138,0.6)}
+.black-key.used{background:linear-gradient(180deg,#0e0e1e,#0a0a16)}
+.black-key.unused{background:linear-gradient(180deg,#070710,#05050e);opacity:0.3}
+.key-label{
+  position:absolute;bottom:4px;left:50%;transform:translateX(-50%);
+  font-size:7px;font-family:'DM Mono',monospace;
+  color:rgba(255,255,255,0.2);pointer-events:none;
+}
+
+/* ── DROP OVERLAY ── */
+#dropOverlay{
+  display:none;position:fixed;inset:0;z-index:300;
+  background:rgba(8,8,20,0.9);
+  border:3px dashed var(--purple);
+  align-items:center;justify-content:center;
+  flex-direction:column;gap:14px;
+}
+#dropOverlay.active{display:flex}
+.drop-icon{font-size:48px}
+.drop-text{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:4px;color:var(--purple)}
+
+/* Divider line between chord and note panels */
+#panelDivider{
+  position:absolute;left:28%;top:0;bottom:0;
+  width:1px;background:linear-gradient(180deg,transparent,rgba(112,112,255,0.3),transparent);
+  pointer-events:none;z-index:10;
+}
+
+#notesToggleBtn{
+  background:rgba(240,192,64,0.1);
+  border:1px solid rgba(240,192,64,0.35);
+  color:var(--gold);
+  font-family:'DM Mono',monospace;
+  font-size:10px;letter-spacing:1px;
+  padding:5px 9px;cursor:pointer;
+  border-radius:4px;white-space:nowrap;
+  flex-shrink:0;transition:all 0.2s;
+}
+#notesToggleBtn:active,#notesToggleBtn.open{
+  background:rgba(240,192,64,0.25);color:#fff;
+  border-color:var(--gold);
+}
+
+/* ── CODE NOTEPAD ── */
+#notePad{
+  position:fixed;
+  top:var(--bar-h);left:0;right:0;bottom:0;
+  z-index:150;
+  background:#08080f;
+  display:flex;flex-direction:column;
+  transform:translateY(100%);
+  transition:transform 0.32s cubic-bezier(0.4,0,0.2,1);
+  border-top:2px solid rgba(240,192,64,0.45);
+}
+#notePad.open{transform:translateY(0)}
+
+#padHeader{
+  display:flex;align-items:center;
+  padding:9px 12px 8px;
+  border-bottom:1px solid rgba(255,255,255,0.07);
+  flex-shrink:0;gap:8px;flex-wrap:wrap;
+}
+#padTitle{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:15px;letter-spacing:3px;color:var(--gold);
+}
+#padStats{font-size:9px;color:rgba(255,255,255,0.22);letter-spacing:1px;flex:1}
+.pad-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.pad-btn{
+  background:none;border:1px solid rgba(255,255,255,0.15);
+  color:rgba(255,255,255,0.55);
+  font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;
+  padding:4px 9px;border-radius:3px;cursor:pointer;transition:all 0.15s;
+}
+.pad-btn:active{border-color:rgba(255,255,255,0.5);color:#fff}
+.pad-btn.danger:active{border-color:#ff5555;color:#ff5555}
+#padClose{
+  background:none;border:1px solid rgba(240,192,64,0.35);
+  color:var(--gold);font-family:'DM Mono',monospace;
+  font-size:9px;letter-spacing:1px;
+  padding:4px 11px;border-radius:3px;cursor:pointer;transition:all 0.15s;
+}
+#padClose:active{background:rgba(240,192,64,0.2)}
+
+#codeArea{
+  flex:1;width:100%;
+  background:#06060e;
+  color:#c4d4f0;
+  font-family:'DM Mono',monospace;
+  font-size:13px;line-height:1.7;
+  padding:12px 14px 12px 18px;
+  border:none;outline:none;resize:none;
+  overflow-y:auto;overflow-x:auto;
+  white-space:pre;
+  -webkit-overflow-scrolling:touch;
+  caret-color:var(--green);
+  tab-size:2;
+  border-left:3px solid rgba(112,112,255,0.15);
+}
+#codeArea::placeholder{color:rgba(255,255,255,0.1);font-style:italic;white-space:pre-wrap}
+#codeArea::-webkit-scrollbar{width:4px;height:4px}
+#codeArea::-webkit-scrollbar-track{background:rgba(255,255,255,0.04)}
+#codeArea::-webkit-scrollbar-thumb{background:rgba(112,112,255,0.3);border-radius:2px}
+
+</style>
+</head>
+<body>
+
+<!-- DROP OVERLAY -->
+<div id="dropOverlay">
+  <div class="drop-icon">🎹</div>
+  <div class="drop-text">DROP MIDI FILE HERE</div>
+</div>
+
+<!-- CODE NOTEPAD PANEL -->
+<div id="notePad">
+  <div id="padHeader">
+    <span id="padTitle">📋 CODE NOTES</span>
+    <span id="padStats">0 lines · 0 chars</span>
+    <div class="pad-actions">
+      <button class="pad-btn" id="padCopyBtn">COPY ALL</button>
+      <button class="pad-btn" id="padSelectBtn">SELECT ALL</button>
+      <button class="pad-btn danger" id="padClearBtn">CLEAR</button>
+      <button id="padClose">✕ HIDE</button>
+    </div>
+  </div>
+  <textarea id="codeArea" spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off"
+    placeholder="// Paste your code or reference notes here...
+// This panel slides over the main view.
+// Tap HIDE to return to the piano.
+
+function example() {
+  return 'Your notes stay here!';
+}"></textarea>
+</div>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="logo">🎹 MIDI</div>
+  <div class="sep"></div>
+  <input type="file" id="fileInput" accept=".mid,.midi">
+  <button id="uploadBtn">⊕ MIDI</button>
+  <div class="sep"></div>
+  <button class="ctrl-btn" id="btnPlay">▶</button>
+  <button class="ctrl-btn" id="btnPause">⏸</button>
+  <button class="ctrl-btn" id="btnStop">⏹</button>
+  <div id="progressWrap">
+    <span id="timeLabel">0:00</span>
+    <div id="progressBar"><div id="progressFill"></div></div>
+  </div>
+  <div class="speed-wrap">
+    <label>SPD</label>
+    <input type="range" id="speedSlider" min="0.25" max="2" step="0.05" value="1">
+    <span id="speedLabel">1.00×</span>
+  </div>
+  <div class="sep"></div>
+  <button id="notesToggleBtn">📋 NOTES</button>
+</div>
+
+<!-- MAIN CONTENT -->
+<div id="mainContent">
+  <!-- KARAOKE SECTION: split into chord panel (left) + note panel (right) -->
+  <div id="karaokeSection">
+
+    <!-- LEFT: Chord Panel -->
+    <div id="chordPanel">
+      <div id="chordPanelLabel">▶ CHORDS</div>
+      <div id="chordDisplay">
+        <div id="chordName" class="no-chord">—</div>
+        <div id="chordKeys"></div>
+        <div id="chordNoteLabels"></div>
+      </div>
+      <div id="nextChordWrap">
+        <div id="nextChordLabel">NEXT</div>
+        <div id="nextChordName">—</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Note Panel -->
+    <div id="notePanel">
+      <div id="notePanelLabel">NOTES TO PLAY</div>
+      <div id="karaokeContainer">
+        <div id="noSongMsg">LOAD A MIDI FILE<span>drag &amp; drop or tap MIDI above</span></div>
+        <div class="kline prev" id="linePrev" style="display:none"></div>
+        <div class="kline curr" id="lineCurr" style="display:none"></div>
+        <div class="kline next" id="lineNext" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PIANO -->
+  <div id="pianoSection">
+    <div id="pianoLabel">KEYBOARD · GREEN = NOTE NOW · PINK = CHORD · PURPLE = NEXT NOTE</div>
+    <div id="pianoScroll"><div id="keyboard"></div></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// MIDI PARSER
+// ═══════════════════════════════════════════
+function MidiParser(buffer) {
+  this.data = new DataView(buffer);
+  this.pos = 0;
+}
+MidiParser.prototype.readUint8  = function(){ return this.data.getUint8(this.pos++); };
+MidiParser.prototype.readUint16 = function(){ var v=this.data.getUint16(this.pos); this.pos+=2; return v; };
+MidiParser.prototype.readUint32 = function(){ var v=this.data.getUint32(this.pos); this.pos+=4; return v; };
+MidiParser.prototype.readStr    = function(n){ var s=''; for(var i=0;i<n;i++) s+=String.fromCharCode(this.readUint8()); return s; };
+MidiParser.prototype.readVarLen = function(){
+  var val=0, b;
+  do { b=this.readUint8(); val=(val<<7)|(b&0x7f); } while(b&0x80);
+  return val;
+};
+MidiParser.prototype.parse = function(){
+  if(this.readStr(4)!=='MThd') throw new Error('Not a MIDI file');
+  this.readUint32();
+  var format=this.readUint16(), numTracks=this.readUint16(), td=this.readUint16();
+  var tracks=[];
+  for(var i=0;i<numTracks;i++) tracks.push(this.parseTrack());
+  return {format:format, numTracks:numTracks, timeDivision:td, tracks:tracks};
+};
+MidiParser.prototype.parseTrack = function(){
+  if(this.readStr(4)!=='MTrk') throw new Error('Expected MTrk');
+  var len=this.readUint32(), end=this.pos+len;
+  var events=[], running=0;
+  while(this.pos < end){
+    var delta=this.readVarLen(), b=this.readUint8();
+    if(b===0xFF){
+      var mt=this.readUint8(), ml=this.readVarLen(), md=[];
+      for(var i=0;i<ml;i++) md.push(this.readUint8());
+      events.push({delta:delta,type:'meta',metaType:mt,data:md});
+      continue;
+    }
+    if(b===0xF0||b===0xF7){ var sl=this.readVarLen(); for(var i=0;i<sl;i++) this.readUint8(); continue; }
+    if(b&0x80) running=b; else { this.pos--; b=running; }
+    var cmd=b&0xF0;
+    if(cmd===0x80||cmd===0x90){
+      var note=this.readUint8(), vel=this.readUint8();
+      events.push({delta:delta,type:(cmd===0x90&&vel>0)?'noteOn':'noteOff',channel:b&0x0F,note:note,velocity:vel});
+    } else if(cmd===0xA0||cmd===0xB0||cmd===0xE0){ this.readUint8(); this.readUint8(); }
+    else if(cmd===0xC0||cmd===0xD0){ this.readUint8(); }
+  }
+  this.pos=end; return events;
+};
+
+function parseMidi(buffer){ return new MidiParser(buffer).parse(); }
+
+function buildTimedEventsMultiTrack(midi){
+  var ppq=midi.timeDivision;
+  var allByTrack = [];
+  for(var t=0;t<midi.tracks.length;t++){
+    var track=midi.tracks[t], tick=0, events=[];
+    var tempo=500000;
+    for(var i=0;i<track.length;i++){
+      var ev=track[i]; tick+=ev.delta;
+      events.push({tick:tick, ev:ev});
+    }
+    allByTrack.push(events);
+  }
+  // Collect tempo map from all tracks
+  var tempoMap=[];
+  for(var t=0;t<allByTrack.length;t++){
+    for(var i=0;i<allByTrack[t].length;i++){
+      var item=allByTrack[t][i];
+      if(item.ev.type==='meta'&&item.ev.metaType===0x51){
+        var d=item.ev.data;
+        tempoMap.push({tick:item.tick,tempo:(d[0]<<16)|(d[1]<<8)|d[2]});
+      }
+    }
+  }
+  tempoMap.sort(function(a,b){return a.tick-b.tick;});
+  if(!tempoMap.length) tempoMap.push({tick:0,tempo:500000});
+
+  function tickToSec(tick){
+    var t=0,cTick=0,cTempo=500000;
+    for(var i=0;i<tempoMap.length;i++){
+      var tm=tempoMap[i];
+      if(tm.tick>=tick) break;
+      var dt=Math.min(tm.tick,tick)-cTick;
+      t+=(dt/ppq)*(cTempo/1e6);
+      cTick=tm.tick; cTempo=tm.tempo;
+    }
+    var dt=tick-cTick;
+    t+=(dt/ppq)*(cTempo/1e6);
+    return t;
+  }
+
+  var melodyTrack=[], chordTrack=[];
+  for(var t=0;t<allByTrack.length;t++){
+    var isMelody = (t===0); // track 0 = Electric Piano (melody), track 1 = Grand Piano (chords)
+    for(var i=0;i<allByTrack[t].length;i++){
+      var item=allByTrack[t][i], ev=item.ev;
+      if(ev.type==='noteOn'||ev.type==='noteOff'){
+        var entry={time:tickToSec(item.tick),type:ev.type,note:ev.note,velocity:ev.velocity};
+        if(isMelody) melodyTrack.push(entry);
+        else chordTrack.push(entry);
+      }
+    }
+  }
+  return {melody:melodyTrack, chords:chordTrack};
+}
+
+var NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+function midiToName(n){ return NOTE_NAMES[n%12]; }
+function midiToOctave(n){ return Math.floor(n/12)-1; }
+
+var CHORD_PATTERNS = {
+  '0,4,7':'maj','0,3,7':'min','0,3,6':'dim','0,4,8':'aug',
+  '0,4,7,11':'maj7','0,4,7,10':'7','0,3,7,10':'min7','0,3,6,10':'dim7',
+  '0,2,7':'sus2','0,5,7':'sus4',
+};
+
+function identifyChord(notes){
+  if(!notes||!notes.length) return '?';
+  if(notes.length===1) return midiToName(notes[0]);
+  var pcs=[...new Set(notes.map(n=>n%12))].sort((a,b)=>a-b);
+  for(var root=0;root<12;root++){
+    var intervals=pcs.map(pc=>((pc-root)+12)%12).sort((a,b)=>a-b).join(',');
+    if(CHORD_PATTERNS[intervals]) return NOTE_NAMES[root]+CHORD_PATTERNS[intervals];
+  }
+  return pcs.map(pc=>NOTE_NAMES[pc]).join('+');
+}
+
+function buildNoteGroups(events){
+  var ons=events.filter(function(e){ return e.type==='noteOn'; });
+  var groups=[], CW=0.04;
+  for(var i=0;i<ons.length;i++){
+    var ev=ons[i];
+    if(groups.length){
+      var last=groups[groups.length-1];
+      if(Math.abs(ev.time-last.time)<CW){
+        last.notes.push(ev.note);
+        last.label=last.notes.map(midiToName).join('+');
+        continue;
+      }
+    }
+    groups.push({time:ev.time,notes:[ev.note],label:midiToName(ev.note)});
+  }
+  return groups;
+}
+
+function buildChordGroups(events){
+  var ons=events.filter(function(e){ return e.type==='noteOn'; });
+  var groups=[], CW=0.06;
+  for(var i=0;i<ons.length;i++){
+    var ev=ons[i];
+    if(groups.length){
+      var last=groups[groups.length-1];
+      if(Math.abs(ev.time-last.time)<CW){
+        last.notes.push(ev.note);
+        last.name=identifyChord(last.notes);
+        continue;
+      }
+    }
+    var g={time:ev.time,notes:[ev.note]};
+    g.name=identifyChord(g.notes);
+    groups.push(g);
+  }
+  // Deduplicate consecutive same chords, keep unique transitions
+  var deduped=[];
+  for(var i=0;i<groups.length;i++){
+    if(!deduped.length||deduped[deduped.length-1].name!==groups[i].name){
+      deduped.push(groups[i]);
+    }
+  }
+  return deduped;
+}
+
+function buildKaraokeLines(groups, LINE_DUR){
+  LINE_DUR = LINE_DUR || 8;
+  if(!groups.length) return [];
+  var lines=[], ls=groups[0].time, cur=[];
+  for(var i=0;i<groups.length;i++){
+    var g=groups[i];
+    if(g.time-ls>LINE_DUR && cur.length){ lines.push({startTime:ls,endTime:g.time,groups:cur}); ls=g.time; cur=[]; }
+    cur.push(g);
+  }
+  if(cur.length) lines.push({startTime:ls,endTime:cur[cur.length-1].time+0.5,groups:cur});
+  return lines;
+}
+
+// ═══════════════════════════════════════════
+// APP STATE
+// ═══════════════════════════════════════════
+var noteGroups=[], karaokeLines=[], chordGroups=[];
+var usedNotes=new Set(), usedChordNotes=new Set(), minNote=48, maxNote=84;
+var isPlaying=false, startTime=0, pausedAt=0;
+var speed=1.0, totalDuration=0;
+var animFrameId=null, synth=null, chordSynth=null;
+var currentGroupIdx=0, currentLineIdx=0, currentChordIdx=0;
+var noteOnTimers=[];
+
+function initSynth(){
+  if(synth){ try{ synth.dispose(); }catch(e){} }
+  if(chordSynth){ try{ chordSynth.dispose(); }catch(e){} }
+  synth=new Tone.PolySynth(Tone.Synth,{
+    oscillator:{type:'triangle'},
+    envelope:{attack:0.01,decay:0.1,sustain:0.7,release:0.5},
+    volume:-6
+  }).toDestination();
+  chordSynth=new Tone.PolySynth(Tone.Synth,{
+    oscillator:{type:'sine'},
+    envelope:{attack:0.02,decay:0.3,sustain:0.5,release:0.8},
+    volume:-12
+  }).toDestination();
+}
+function playNote(n, dur, isChord){
+  var s=isChord?chordSynth:synth;
+  if(!s) return;
+  dur = dur||0.3;
+  try{ s.triggerAttackRelease(Tone.Frequency(n,'midi').toFrequency(), dur/speed); }catch(e){}
+}
+
+// ═══════════════════════════════════════════
+// MINI CHORD KEYBOARD
+// ═══════════════════════════════════════════
+var WHITE_PCS=[0,2,4,5,7,9,11];
+var BLACK_PCS=[1,3,6,8,10];
+// We show one octave (C to B) as mini keyboard
+function buildChordKeyboard(activeNotes){
+  var ck=document.getElementById('chordKeys');
+  ck.innerHTML='';
+  // 1.5 octaves centered, 14 white keys
+  var startPc=0; // C
+  var whites=[]; // pitchclasses in order
+  for(var oct=0;oct<2;oct++){
+    for(var i=0;i<WHITE_PCS.length;i++){
+      whites.push(WHITE_PCS[i]+oct*12);
+    }
+  }
+  whites=whites.slice(0,14); // C4..B5
+  var ww=13, wh=42, bw=8, bh=26;
+  ck.style.cssText='position:relative;height:'+wh+'px;width:'+(whites.length*(ww+1))+'px;';
+  var activeSet=new Set((activeNotes||[]).map(n=>n%12));
+  for(var i=0;i<whites.length;i++){
+    var pc=whites[i]%12;
+    var el=document.createElement('div');
+    el.className='ck-white'+(activeSet.has(pc)?' ck-active':'');
+    el.style.cssText='width:'+ww+'px;height:'+wh+'px;margin-right:1px;display:inline-block;vertical-align:top;position:relative;';
+    ck.appendChild(el);
+  }
+  // Black keys
+  var blackPcs=[1,3,6,8,10];
+  for(var i=0;i<whites.length-1;i++){
+    var pc=whites[i]%12;
+    var nextPc=(pc+1)%12;
+    if(blackPcs.indexOf(nextPc)>=0){
+      var bel=document.createElement('div');
+      var bActive=activeSet.has(nextPc);
+      bel.className='ck-black'+(bActive?' ck-active':'');
+      var x=i*(ww+1)+ww-Math.floor(bw/2);
+      bel.style.cssText='left:'+x+'px;width:'+bw+'px;height:'+bh+'px;position:absolute;top:0;';
+      ck.appendChild(bel);
+    }
+  }
+}
+
+function updateChordPanel(chordIdx){
+  var nameEl=document.getElementById('chordName');
+  var labEl=document.getElementById('chordNoteLabels');
+  var nextNameEl=document.getElementById('nextChordName');
+  if(chordIdx<0||!chordGroups.length){
+    nameEl.textContent='—'; nameEl.className='no-chord';
+    labEl.textContent='';
+    buildChordKeyboard([]);
+    nextNameEl.textContent='—'; return;
+  }
+  var cg=chordGroups[Math.min(chordIdx,chordGroups.length-1)];
+  nameEl.textContent=cg.name; nameEl.className='';
+  labEl.textContent=cg.notes.map(midiToName).join(' · ');
+  buildChordKeyboard(cg.notes);
+  var next=chordGroups[chordIdx+1];
+  nextNameEl.textContent=next?next.name:'—';
+}
+
+// ═══════════════════════════════════════════
+// KEYBOARD
+// ═══════════════════════════════════════════
+var WHITE_NOTES=[0,2,4,5,7,9,11];
+function buildKeyboard(){
+  var kb=document.getElementById('keyboard'); kb.innerHTML='';
+  var pianoH=document.getElementById('pianoSection').clientHeight - 28;
+  var WH=Math.max(48, Math.min(88, pianoH-12));
+  var WW=Math.max(16, Math.floor(WH*0.28));
+  var BW=Math.floor(WW*0.62), BH=Math.floor(WH*0.6);
+  var lo=minNote, hi=maxNote;
+  while(lo%12!==0) lo--; while(hi%12!==11) hi++; hi=Math.min(127,hi+1);
+  var whites=[];
+  for(var n=lo;n<=hi;n++){ if(WHITE_NOTES.indexOf(n%12)>=0) whites.push(n); }
+  kb.style.width=(whites.length*(WW+1))+'px';
+  kb.style.height=WH+'px';
+  for(var i=0;i<whites.length;i++){
+    var n=whites[i], k=document.createElement('div');
+    k.className='white-key'+(usedNotes.has(n)?' used':(usedChordNotes.has(n)?' used':' unused'));
+    k.style.cssText='width:'+WW+'px;height:'+WH+'px;margin-right:1px;';
+    if(n%12===0){ var l=document.createElement('span'); l.className='key-label'; l.textContent='C'+midiToOctave(n); k.appendChild(l); }
+    k.dataset.note=n; kb.appendChild(k);
+  }
+  for(var n=lo;n<=hi;n++){
+    var pc=n%12;
+    if(WHITE_NOTES.indexOf(pc)<0){
+      var wi=whites.indexOf(n-1); if(wi<0) continue;
+      var k=document.createElement('div');
+      k.className='black-key'+(usedNotes.has(n)?' used':(usedChordNotes.has(n)?'used':' unused'));
+      var x=wi*(WW+1)+WW-Math.floor(BW/2);
+      k.style.cssText='left:'+x+'px;width:'+BW+'px;height:'+BH+'px;';
+      k.dataset.note=n; kb.appendChild(k);
+    }
+  }
+}
+
+function highlightKeys(active, next, chordNotes){
+  var keys=document.querySelectorAll('[data-note]');
+  for(var i=0;i<keys.length;i++){
+    var k=keys[i], n=parseInt(k.dataset.note);
+    k.classList.remove('active-green','active-purple','active-coral');
+    if(active.indexOf(n)>=0) k.classList.add('active-green');
+    else if(next.indexOf(n)>=0) k.classList.add('active-purple');
+    else if(chordNotes&&chordNotes.indexOf(n)>=0) k.classList.add('active-coral');
+  }
+}
+
+// ═══════════════════════════════════════════
+// KARAOKE
+// ═══════════════════════════════════════════
+function renderKaraokeLines(){
+  var prev=document.getElementById('linePrev');
+  var curr=document.getElementById('lineCurr');
+  var next=document.getElementById('lineNext');
+  var noMsg=document.getElementById('noSongMsg');
+  if(!karaokeLines.length){
+    noMsg.style.display=''; prev.style.display='none'; curr.style.display='none'; next.style.display='none'; return;
+  }
+  noMsg.style.display='none'; prev.style.display=''; curr.style.display=''; next.style.display='';
+  function fill(el,li){
+    el.innerHTML=''; if(li<0||li>=karaokeLines.length) return;
+    var line=karaokeLines[li];
+    for(var i=0;i<line.groups.length;i++){
+      var c=document.createElement('span');
+      c.className='note-chip'; c.textContent=line.groups[i].label;
+      c.dataset.gidx=(line._sgi||0)+i; el.appendChild(c);
+    }
+  }
+  fill(prev,currentLineIdx-1); fill(curr,currentLineIdx); fill(next,currentLineIdx+1);
+  updateKaraokeHighlights();
+}
+
+function precomputeLineGroupIndices(){
+  var idx=0;
+  for(var i=0;i<karaokeLines.length;i++){ karaokeLines[i]._sgi=idx; idx+=karaokeLines[i].groups.length; }
+}
+
+function updateKaraokeHighlights(){
+  var curr=document.getElementById('lineCurr'); if(!curr) return;
+  var chips=curr.querySelectorAll('.note-chip');
+  for(var i=0;i<chips.length;i++){
+    var gi=parseInt(chips[i].dataset.gidx);
+    chips[i].classList.remove('played','active','next-note','upcoming');
+    if(gi<currentGroupIdx) chips[i].classList.add('played');
+    else if(gi===currentGroupIdx) chips[i].classList.add('active');
+    else if(gi===currentGroupIdx+1) chips[i].classList.add('next-note');
+    else chips[i].classList.add('upcoming');
+  }
+}
+
+function updateLineIfNeeded(){
+  if(!karaokeLines.length) return;
+  var line=karaokeLines[currentLineIdx]; if(!line) return;
+  if(currentGroupIdx>(line._sgi+line.groups.length-1)){ currentLineIdx++; renderKaraokeLines(); }
+  else updateKaraokeHighlights();
+}
+
+// ═══════════════════════════════════════════
+// CHORD SYNC
+// ═══════════════════════════════════════════
+function findChordIdxAtTime(t){
+  var idx=0;
+  for(var i=0;i<chordGroups.length;i++){
+    if(chordGroups[i].time<=t) idx=i;
+    else break;
+  }
+  return chordGroups.length?idx:-1;
+}
+
+// ═══════════════════════════════════════════
+// PLAYBACK
+// ═══════════════════════════════════════════
+function currentPlaybackTime(){
+  if(!isPlaying) return pausedAt;
+  return pausedAt+(performance.now()/1000-startTime)*speed;
+}
+
+function scheduleAllNotes(){
+  clearAllTimers();
+  var offset=pausedAt;
+  for(var gi=0;gi<noteGroups.length;gi++){
+    (function(gi){
+      var g=noteGroups[gi];
+      var delay=(g.time-offset)/speed;
+      if(delay<-0.05) return;
+      var tid=setTimeout(function(){
+        var dur=gi+1<noteGroups.length ? Math.min(0.5,noteGroups[gi+1].time-g.time) : 0.4;
+        for(var j=0;j<g.notes.length;j++) playNote(g.notes[j],dur,false);
+        currentGroupIdx=gi; updateLineIfNeeded();
+        var nn=gi+1<noteGroups.length ? noteGroups[gi+1].notes : [];
+        // Get current chord notes (for coral highlight)
+        var ci=findChordIdxAtTime(g.time);
+        currentChordIdx=ci;
+        updateChordPanel(ci);
+        var cn=ci>=0?chordGroups[ci].notes:[];
+        highlightKeys(g.notes, nn, cn);
+      }, Math.max(0,delay*1000));
+      noteOnTimers.push(tid);
+    })(gi);
+  }
+  // Schedule chord updates independently
+  for(var ci=0;ci<chordGroups.length;ci++){
+    (function(ci){
+      var cg=chordGroups[ci];
+      var delay=(cg.time-offset)/speed;
+      if(delay<-0.05) return;
+      var tid=setTimeout(function(){
+        // Play chord notes softly
+        var dur=ci+1<chordGroups.length ? Math.min(1.5,chordGroups[ci+1].time-cg.time) : 1.0;
+        for(var j=0;j<cg.notes.length;j++) playNote(cg.notes[j],dur,true);
+      }, Math.max(0,delay*1000));
+      noteOnTimers.push(tid);
+    })(ci);
+  }
+  noteOnTimers.push(setTimeout(function(){ stopPlayback(); }, (totalDuration-pausedAt)/speed*1000));
+}
+
+function clearAllTimers(){ for(var i=0;i<noteOnTimers.length;i++) clearTimeout(noteOnTimers[i]); noteOnTimers=[]; }
+
+function playbackLoop(){
+  if(!isPlaying) return;
+  var t=currentPlaybackTime();
+  document.getElementById('progressFill').style.width=Math.min(100,(t/totalDuration)*100)+'%';
+  document.getElementById('timeLabel').textContent=fmtTime(t);
+  animFrameId=requestAnimationFrame(playbackLoop);
+}
+
+function startPlayback(){
+  if(!noteGroups.length) return;
+  Tone.start(); if(!synth) initSynth();
+  isPlaying=true; startTime=performance.now()/1000;
+  document.getElementById('btnPlay').classList.add('active');
+  document.getElementById('btnPause').classList.remove('active');
+  scheduleAllNotes(); animFrameId=requestAnimationFrame(playbackLoop);
+}
+
+function pausePlayback(){
+  if(!isPlaying) return;
+  pausedAt=currentPlaybackTime(); isPlaying=false; clearAllTimers(); cancelAnimationFrame(animFrameId);
+  document.getElementById('btnPlay').classList.remove('active');
+  document.getElementById('btnPause').classList.add('active');
+  highlightKeys([],[],[]);
+}
+
+function stopPlayback(){
+  pausedAt=0; isPlaying=false; clearAllTimers(); cancelAnimationFrame(animFrameId);
+  currentGroupIdx=0; currentLineIdx=0; currentChordIdx=0;
+  document.getElementById('btnPlay').classList.remove('active');
+  document.getElementById('btnPause').classList.remove('active');
+  document.getElementById('progressFill').style.width='0%';
+  document.getElementById('timeLabel').textContent='0:00';
+  highlightKeys([],[],[]); renderKaraokeLines();
+  updateChordPanel(-1);
+}
+
+function seekTo(t){
+  t=Math.max(0,Math.min(totalDuration,t));
+  var was=isPlaying; if(was) pausePlayback();
+  pausedAt=t;
+  currentGroupIdx=0;
+  for(var i=0;i<noteGroups.length;i++){ if(noteGroups[i].time<=t) currentGroupIdx=i; else break; }
+  currentLineIdx=0;
+  for(var i=0;i<karaokeLines.length;i++){ if(karaokeLines[i].endTime<=t) currentLineIdx=i+1; else break; }
+  currentLineIdx=Math.min(currentLineIdx,Math.max(0,karaokeLines.length-1));
+  currentChordIdx=findChordIdxAtTime(t);
+  updateChordPanel(currentChordIdx);
+  renderKaraokeLines();
+  document.getElementById('progressFill').style.width=((t/totalDuration)*100)+'%';
+  document.getElementById('timeLabel').textContent=fmtTime(t);
+  if(was) startPlayback();
+}
+
+function fmtTime(s){ var m=Math.floor(s/60); return m+':'+String(Math.floor(s%60)).padStart(2,'0'); }
+
+function loadMidi(buffer, name){
+  try{
+    stopPlayback();
+    var parsed=parseMidi(buffer);
+    var multiTrack=buildTimedEventsMultiTrack(parsed);
+    var melodyEvents=multiTrack.melody;
+    var chordEvents=multiTrack.chords;
+
+    // If only one track, split by channel
+    if(!chordEvents.length&&melodyEvents.length){
+      // fallback: treat all as melody
+      noteGroups=buildNoteGroups(melodyEvents);
+      chordGroups=[];
+    } else {
+      noteGroups=buildNoteGroups(melodyEvents);
+      chordGroups=buildChordGroups(chordEvents);
+    }
+
+    if(!noteGroups.length){ alert('No notes found in MIDI file.'); return; }
+
+    usedNotes=new Set(noteGroups.reduce(function(a,g){ return a.concat(g.notes); },[]));
+    usedChordNotes=new Set((chordGroups||[]).reduce(function(a,g){ return a.concat(g.notes); },[]));
+    var na=Array.from(usedNotes);
+    var ca=Array.from(usedChordNotes);
+    var allN=na.concat(ca);
+    minNote=Math.max(0,Math.min.apply(null,allN)-2);
+    maxNote=Math.min(127,Math.max.apply(null,allN)+2);
+    totalDuration=noteGroups[noteGroups.length-1].time+1;
+    karaokeLines=buildKaraokeLines(noteGroups);
+    precomputeLineGroupIndices();
+    document.getElementById('timeLabel').textContent='0:00';
+    buildKeyboard(); renderKaraokeLines(); initSynth();
+    updateChordPanel(chordGroups.length?0:-1);
+  }catch(e){ console.error(e); alert('MIDI parse error: '+e.message); }
+}
+
+// ═══════════════════════════════════════════
+// WIRING
+// ═══════════════════════════════════════════
+document.getElementById('uploadBtn').addEventListener('click', function(){ document.getElementById('fileInput').click(); });
+document.getElementById('fileInput').addEventListener('change', function(e){
+  var f=e.target.files[0]; if(!f) return;
+  var r=new FileReader(); r.onload=function(ev){ loadMidi(ev.target.result, f.name); }; r.readAsArrayBuffer(f);
+});
+document.getElementById('btnPlay').addEventListener('click', function(){ if(!isPlaying) startPlayback(); });
+document.getElementById('btnPause').addEventListener('click', function(){ if(isPlaying) pausePlayback(); else startPlayback(); });
+document.getElementById('btnStop').addEventListener('click', stopPlayback);
+document.getElementById('progressBar').addEventListener('click', function(e){
+  var r=e.currentTarget.getBoundingClientRect();
+  seekTo(((e.clientX-r.left)/r.width)*totalDuration);
+});
+document.getElementById('speedSlider').addEventListener('input', function(e){
+  var was=isPlaying; if(was) pausePlayback();
+  speed=parseFloat(e.target.value);
+  document.getElementById('speedLabel').textContent=speed.toFixed(2)+'x';
+  if(was) startPlayback();
+});
+document.addEventListener('keydown', function(e){
+  if(e.target===document.getElementById('codeArea')) return;
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+  if(e.code==='Space'){ e.preventDefault(); if(isPlaying) pausePlayback(); else startPlayback(); }
+  else if(e.code==='ArrowRight'){ e.preventDefault(); seekTo(currentPlaybackTime()+5); }
+  else if(e.code==='ArrowLeft'){ e.preventDefault(); seekTo(currentPlaybackTime()-5); }
+});
+document.addEventListener('dragover', function(e){ e.preventDefault(); document.getElementById('dropOverlay').classList.add('active'); });
+document.addEventListener('dragleave', function(e){ if(!e.relatedTarget) document.getElementById('dropOverlay').classList.remove('active'); });
+document.addEventListener('drop', function(e){
+  e.preventDefault(); document.getElementById('dropOverlay').classList.remove('active');
+  var f=e.dataTransfer.files[0]; if(!f) return;
+  var r=new FileReader(); r.onload=function(ev){ loadMidi(ev.target.result, f.name); }; r.readAsArrayBuffer(f);
+});
+window.addEventListener('resize', function(){ if(noteGroups.length) buildKeyboard(); });
+
+
+// ═══════════════════════════════════════════
+// NOTEPAD
+// ═══════════════════════════════════════════
+var padOpen = false;
+
+function toggleNotepad() {
+  padOpen = !padOpen;
+  document.getElementById('notePad').classList.toggle('open', padOpen);
+  document.getElementById('notesToggleBtn').classList.toggle('open', padOpen);
+  if (padOpen) setTimeout(function(){ document.getElementById('codeArea').focus(); }, 350);
+}
+
+function updatePadStats() {
+  var v = document.getElementById('codeArea').value;
+  var lines = v ? v.split('\n').length : 0;
+  document.getElementById('padStats').textContent = lines + ' lines · ' + v.length + ' chars';
+}
+
+document.getElementById('notesToggleBtn').addEventListener('click', toggleNotepad);
+document.getElementById('padClose').addEventListener('click', toggleNotepad);
+
+document.getElementById('padCopyBtn').addEventListener('click', function() {
+  var ta = document.getElementById('codeArea');
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(ta.value);
+  } else { ta.select(); document.execCommand('copy'); }
+});
+
+document.getElementById('padSelectBtn').addEventListener('click', function() {
+  var ta = document.getElementById('codeArea');
+  ta.focus(); ta.select();
+});
+
+document.getElementById('padClearBtn').addEventListener('click', function() {
+  if (confirm('Clear all notes? This cannot be undone.')) {
+    document.getElementById('codeArea').value = '';
+    updatePadStats();
+  }
+});
+
+document.getElementById('codeArea').addEventListener('input', updatePadStats);
+document.getElementById('codeArea').addEventListener('keydown', function(e) {
+  e.stopPropagation();
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    var ta = document.getElementById('codeArea');
+    var s = ta.selectionStart, end = ta.selectionEnd;
+    ta.value = ta.value.substring(0,s) + '  ' + ta.value.substring(end);
+    ta.selectionStart = ta.selectionEnd = s + 2;
+    updatePadStats();
+  }
+});
+
+// ── Auto-load bundled MIDI ──
+var BUNDLED_MIDI = "TVRoZAAAAAYAAQACAYBNVHJrAAATAwD/WAQEAhgIAP9RAwbIHAD/Aw5FbGVjdHJpYyBQaWFubwDABYYAkEgyYIBIAIFAkEkyYIBJAIFAkEgyYIBIAGCQRjJggEYAgiCQRDJggEQAgiCQSDJggEgAYJBJMmCASQCBQJBIMmCASACBQJBGMmCARgCJYJBBMmCAQQBgkEEyYIBBAGCQQTJggEEAYJBCMmCAQgCCIJBEMmCARACCIJBGMmCARgCIIJBIMmCASABgkEkyYIBJAIFAkEgyYIBIAIFAkEYyYIBGAIUgkEgyYIBIAGCQSTJggEkAgUCQSDJggEgAgUCQRjJggEYAiyCQQTJggEEAYJBBMmCAQQBgkEIyYIBCAIIgkEQyYIBEAIIgkEYyYIBGAIggkE0yYIBNAGCQTjJggE4AgUCQTTJggE0AgUCQSzJggEsAg2CQSTJggEkAYJBNMmCATQBgkE4yYIBOAIFAkE0yYIBNAIFAkEkyYIBJAIlgkEkyYIBJAGCQSTJggEkAYJBJMmCASQBgkEsyYIBLAIIgkE0yYIBNAIIgkE4yYIBOAIZgkEkyYIBJAGCQTTJggE0AYJBOMmCATgCBQJBNMmCATQCBQJBLMmCASwCDYJBJMmCASQBgkE0yYIBNAGCQTjJggE4AgUCQTTJggE0AgUCQSTJggEkAiCCQSTJggEkAjiCQSTJggEkAYJBJMmCASQBgkEkyYIBJAGCQSTJggEkAYJBJMmCASQBgkEgyYIBIAGCQSDJggEgAYJBIMmCASABgkEgyYIBIAGCQRjJggEYAYJBGMmCARgCCIJBGMmCARgCCIJBEMmCARACCIJBEMmCARACCIJBGMmCARgCCIJBBMmCAQQCCIJBEMmCARABgkEYyYIBGAGCQRDJggEQAgiCQRjJggEYAYJBBMmCAQQCDYJBGMmCARgBgkEgyYIBIAGCQSTJggEkAYJBJMmCASQBgkEkyYIBJAGCQSTJggEkAYJBJMmCASQBgkEgyYIBIAGCQSDJggEgAYJBIMmCASABgkEgyYIBIAGCQRjJggEYAYJBGMmCARgCCIJBGMmCARgCCIJBEMmCARACCIJBEMmCARACCIJBGMmCARgCCIJBBMmCAQQCCIJBEMmCARABgkEYyYIBGAGCQRDJggEQAgiCQRjJggEYAgiCQSTJggEkAgiCQSzJggEsAiCCQUDJggFAAYJBQMmCAUABgkFAyYIBQAGCQUDJggFAAYJBJMmCASQCCIJBJMmCASQCCIJBNMmCATQCCIJBLMmCASwBgkEkyYIBJAIZgkFAyYIBQAGCQUDJggFAAYJBQMmCAUABgkFAyYIBQAGCQSTJggEkAgiCQSTJggEkAgiCQTTJggE0AgiCQSzJggEsAYJBJMmCASQCFIJBJMmCASQBgkFAyYIBQAGCQUDJggFAAYJBQMmCAUABgkFAyYIBQAGCQSTJggEkAgiCQSTJggEkAgiCQTTJggE0AgiCQSzJggEsAYJBJMmCASQCJYJBJMmCASQBgkEkyYIBJAGCQSTJggEkAYJBJMmCASQBgkEkyYIBJAGCQSDJggEgAYJBJMmCASQBgkEkyYIBJAINgkEsyYIBLAGCQTTJggE0AYJBJMmCASQCCIJBEMmCARACDYJBJMmCASQBgkEkyYIBJAGCQSTJggEkAYJBJMmCASQBgkEgyYIBIAGCQSTJggEkAYJBJMmCASQCCIJBEMmCARABgkEsyYIBLAGCQTTJggE0AYJBJMmCASQCCIJBEMmCARACCIJBJMmCASQBgkEkyYIBJAGCQSTJggEkAYJBJMmCASQBgkEkyYIBJAGCQSDJggEgAYJBJMmCASQBgkEkyYIBJAINgkEsyYIBLAGCQTTJggE0AYJBJMmCASQCCIJBEMmCARACCIJBJMmCASQBgkEkyYIBJAGCQSTJggEkAYJBJMmCASQBgkEkyYIBJAGCQSDJggEgAYJBJMmCASQBgkEkyYIBJAIlgkFAyYIBQAGCQUDJggFAAYJBQMmCAUABgkFAyYIBQAGCQSTJggEkAgiCQSTJggEkAiCCQTTIAkE0yAJBQMgCQUDJggFAAAIBQAACATQAAgE0AhSCQSzIAkE4yYIBOAACASwCDYJBNMgCQUDJggFAAAIBNAGCQSTIAkE0yYIBNAACASQCpIJBIMmCASACBQJBJMmCASQCBQJBIMmCASABgkEYyYIBGAINgkEQyYIBEAGCQSDJggEgAYJBJMmCASQCBQJBIMmCASACBQJBGMmCARgCJYJBBMmCAQQBgkEEyYIBBAGCQQTJggEEAYJBCMmCAQgCCIJBEMmCARACCIJBGMmCARgCIIJBIMmCASABgkEkyYIBJAIFAkEgyYIBIAIFAkEYyYIBGAIUgkEgyYIBIAGCQSTJggEkAgUCQSDJggEgAgUCQRjJggEYAiyCQQTJggEEAYJBBMmCAQQBgkEIyYIBCAIIgkEQyYIBEAIIgkEYyYIBGAIlgkEsyAJBOMmCATgAAgEsAYJBLMgCQTjJggE4AAIBLAGCQSzIAkE4yYIBOAACASwBgkEsyAJBOMmCATgAAgEsAg2CQSTIAkE0yYIBNAACASQBgkEgyAJBLMmCASwAAgEgAiyCQTTJggE0AYJBNMmCATQBgkE0yYIBNAGCQTTJggE0AYJBNMmCATQCCIJBJMmCASQBgkE4yYIBOAIIgkE0yYIBNAIIgkEkyYIBJAIUgkEkyYIBJAGCQSzIAkE4yYIBOAACASwBgkEsyAJBOMmCATgAAgEsAgUCQSzIAkE4yYIBOAACASwCBQJBLMgCQTjJggE4AAIBLAINgkEkyAJBNMmCATQAAgEkAYJBIMgCQSzJggEsAAIBIAIsgkE0yYIBNAGCQTTJggE0AYJBNMmCATQCCIJBNMmCATQCCIJBJMmCASQBgkE4yYIBOAIIgkE0yYIBNAIIgkEkyYIBJAGCQSTJggEkAYJBJMmCASQBgkEkyYIBJAGCQSTJggEkAYJBJMmCASQBgkEgyYIBIAGCQSDJggEgAYJBIMmCASABgkEgyYIBIAGCQRjJggEYAYJBGMmCARgCCIJBGMmCARgCCIJBEMmCARACCIJBEMmCARACCIJBGMmCARgCCIJBBMmCAQQCCIJBEMmCARABgkEYyYIBGAGCQRDJggEQAgiCQRjJggEYAYJBBMmCAQQCDYJBGMmCARgBgkEgyYIBIAGCQSTJggEkAYJBJMmCASQBgkEkyYIBJAGCQSTJggEkAYJBJMmCASQBgkEgyYIBIAGCQSDJggEgAYJBIMmCASABgkEgyYIBIAGCQRjJggEYAYJBGMmCARgCCIJBGMmCARgCCIJBEMmCARACCIJBEMmCARACCIJBGMmCARgCCIJBBMmCAQQCCIJBEMmCARABgkEYyYIBGAGCQRDJggEQAgiCQRjJggEYAgiCQSTJggEkAgiCQSzJggEsAiCCQUDJggFAAYJBQMmCAUABgkFAyYIBQAGCQUDJggFAAYJBJMmCASQCCIJBJMmCASQCCIJBNMmCATQCCIJBLMmCASwBgkEkyYIBJAIZgkFAyYIBQAGCQUDJggFAAYJBQMmCAUABgkFAyYIBQAGCQSTJggEkAgiCQSTJggEkAgiCQTTJggE0AgiCQSzJggEsAYJBJMmCASQCFIJBJMmCASQBgkFAyYIBQAGCQUDJggFAAYJBQMmCAUABgkFAyYIBQAGCQSTJggEkAgiCQSTJggEkAgiCQTTJggE0AgiCQSzJggEsAYJBJMmCASQCJYJBJMmCASQBgkEkyYIBJAGCQSTJggEkAYJBJMmCASQBgkEkyYIBJAGCQSDJggEgAYJBJMmCASQBgkEkyYIBJAINgkEsyYIBLAGCQTTJggE0AYJBJMmCASQCCIJBEMmCARACDYJBJMmCASQBgkEkyYIBJAGCQSTJggEkAYJBJMmCASQBgkEgyYIBIAGCQSTJggEkAYJBJMmCASQCCIJBEMmCARABgkEsyYIBLAGCQTTJggE0AYJBJMmCASQCCIJBEMmCARACCIJBJMmCASQBgkEkyYIBJAGCQSTJggEkAYJBJMmCASQBgkEkyYIBJAGCQSDJggEgAYJBJMmCASQBgkEkyYIBJAINgkEsyYIBLAGCQTTJggE0AYJBJMmCASQCCIJBEMmCARACCIJBJMmCASQBgkEkyYIBJAGCQSTJggEkAYJBJMmCASQBgkEkyYIBJAGCQSDJggEgAYJBJMmCASQBgkEkyYIBJAIlgkFAyYIBQAGCQUDJggFAAYJBQMmCAUABgkFAyYIBQAGCQSTJggEkAgiCQSTJggEkAiCCQTTIAkE0yAJBQMgCQUDJggFAAAIBQAACATQAAgE0AhSCQSzIAkE4yYIBOAACASwCDYJBNMgCQUDJggFAAAIBNAGCQSTIAkE0yYIBNAACASQCjIJBNMgCQTTIAkFAyAJBQMmCAUAAAgFAAAIBNAACATQCFIJBLMgCQTjJggE4AAIBLAINgkE0yAJBQMmCAUAAAgE0AYJBJMgCQTTJggE0AAIBJAJ0gkEYyYIBGAGCQSTJggEkAYJBLMmCASwBgkEkyYIBJAGCQUDJggFAAhSCQTTJggE0AYJBLMmCASwBgkEkyYIBJAGCQSzJggEsAYJBGMmCARgCpIJBEMmCARABgkEQyYIBEAGCQRDJggEQAYJBEMmCARABgkD0yYIA9AIIgkD0yYIA9AIIgkEEyYIBBAIIgkD8yYIA/AGCQPTJggD0AhmCQRDJggEQAYJBGMmCARgBgkEkyYIBJAGCQRjJggEYAYJBJMmCASQCLIJBJMmCASQBgkEkyYIBJAGCQSTJggEkAYJBJMmCASQBgkEkyYIBJAGCQSDJggEgAYJBIMmCASABgkEgyYIBIAGCQSDJggEgAYJBGMmCARgBgkEYyYIBGAIIgkEYyYIBGAIIgkEQyYIBEAIIgkEQyYIBEAIIgkEYyYIBGAIIgkEEyYIBBAIIgkEQyYIBEAGCQRjJggEYAYJBEMmCARACCIJBGMmCARgBgkEEyYIBBAINgkEYyYIBGAGCQSDJggEgAYJBJMmCASQBgkEkyYIBJAGCQSTJggEkAYJBJMmCASQBgkEkyYIBJAGCQSDJggEgAYJBIMmCASABgkEgyYIBIAGCQSDJggEgAYJBGMmCARgBgkEYyYIBGAIIgkEYyYIBGAIIgkEQyYIBEAIIgkEQyYIBEAIIgkEYyYIBGAIIgkEEyYIBBAIIgkEQyYIBEAGCQRjJggEYAYJBOMmCATgCCIJBNMmCATQCCIJBJMmCASQCCIJBLMmCASwCIIJBQMmCAUABgkFAyYIBQAGCQUDJggFAAYJBQMmCAUABgkEkyYIBJAIIgkEkyYIBJAIIgkE0yYIBNAIIgkEsyYIBLAGCQSTJggEkAhmCQUDJggFAAYJBQMmCAUABgkFAyYIBQAGCQUDJggFAAYJBJMmCASQCCIJBJMmCASQCCIJBNMmCATQCCIJBLMmCASwBgkEkyYIBJAIUgkEkyYIBJAGCQUDJggFAAYJBQMmCAUABgkFAyYIBQAGCQUDJggFAAYJBJMmCASQCCIJBJMmCASQCCIJBNMmCATQCCIJBLMmCASwBgkEkyYIBJAIlgkEkyYIBJAGCQSTJggEkAYJBJMmCASQBgkEkyYIBJAGCQSTJggEkAYJBIMmCASABgkEkyYIBJAGCQSTJggEkAg2CQSzJggEsAYJBNMmCATQBgkEkyYIBJAIIgkEQyYIBEAINgkEkyYIBJAGCQSTJggEkAYJBJMmCASQBgkEkyYIBJAGCQSDJggEgAYJBJMmCASQBgkEkyYIBJAIIgkEQyYIBEAGCQSzJggEsAYJBNMmCATQBgkEkyYIBJAIIgkEQyYIBEAIIgkEkyYIBJAGCQSTJggEkAYJBJMmCASQBgkEkyYIBJAGCQSTJggEkAYJBIMmCASABgkEkyYIBJAGCQSTJggEkAg2CQSzJggEsAYJBNMmCATQBgkEkyYIBJAIIgkEQyYIBEAIIgkEkyYIBJAGCQSTJggEkAYJBJMmCASQBgkEkyYIBJAGCQSTJggEkAYJBIMmCASABgkEkyYIBJAGCQSTJggEkAiWCQUDJggFAAYJBQMmCAUABgkFAyYIBQAGCQUDJggFAAYJBJMmCASQCCIJBJMmCASQCIIJBNMgCQTTIAkFAyAJBQMmCAUAAAgFAAAIBNAACATQCFIJBLMgCQTjJggE4AAIBLAINgkE0yAJBQMmCAUAAAgE0AYJBJMgCQTTJggE0AAIBJAKMgkE0yAJBNMgCQUDIAkFAyYIBQAACAUAAAgE0AAIBNAIUgkEsyAJBOMmCATgAAgEsAg2CQTTIAkFAyYIBQAACATQBgkEkyAJBNMmCATQAAgEkAkSCQUDJggFAAYJBQMmCAUABgkFAyYIBQAGCQUDJggFAAYJBJMmCASQCCIJBJMmCASQCCIJBNMmCATQCCIJBLMmCASwBgkEkyYIBJAAD/LwBNVHJrAAAqVAD/AwtHcmFuZCBQaWFubwDBAACRNjIAkToyAJE9MmCBPQAAgToAAIE2AIIgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCFIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIIgkTgyAJE8MgCRPzJggT8AAIE8AACBOACFIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAgiCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AIIgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCFIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAgiCRNTIAkToyAJE9MmCBPQAAgToAAIE1AIIgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCFIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAgiCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIIgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCFIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIIgkTgyAJE8MgCRPzJggT8AAIE8AACBOACFIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAgiCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AIIgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCFIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAgiCRNTIAkToyAJE9MmCBPQAAgToAAIE1AIIgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCFIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAgiCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIIgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCFIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIIgkTgyAJE8MgCRPzJggT8AAIE8AACBOACFIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAgiCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AIIgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCFIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAgiCRNTIAkToyAJE9MmCBPQAAgToAAIE1AIIgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCFIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAgiCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIIgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCFIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIIgkTgyAJE8MgCRPzJggT8AAIE8AACBOACFIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAgiCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AIIgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCFIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAgiCRNTIAkToyAJE9MmCBPQAAgToAAIE1AIIgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCFIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAgiCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIIgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAgiCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIIgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIIgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAgiCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AIIgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCCIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAgiCRNTIAkToyAJE9MmCBPQAAgToAAIE1AIIgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCCIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAgiCRNTIAkToyAJE9MmCBPQAAgToAAIE1AIIgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAgiCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIIgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIIgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAgiCRPTJggT0AgiCRPTJggT0AgiCRPDJggTwAgiCRPDJggTwAgiCROjIAkT0yYIE9AACBOgCCIJE6MgCRPTJggT0AAIE6AIIgkToyAJE9MgCRQTJggUEAAIE9AACBOgCCIJE6MgCRPTIAkUEyYIFBAACBPQAAgToAgiCRNjIAkToyAJE9MmCBPQAAgToAAIE2AINgkTYyAJE6MgCRPTJggT0AAIE6AACBNgBgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AINgkTgyAJE8MgCRPzJggT8AAIE8AACBOABgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAgiCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AINgkTUyAJE4MgCRPTJggT0AAIE4AACBNQBgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCCIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAgiCRNTIAkToyAJE9MmCBPQAAgToAAIE1AINgkTUyAJE6MgCRPTJggT0AAIE6AACBNQBgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCCIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAgiCRNjIAkToyAJE9MmCBPQAAgToAAIE2AINgkTYyAJE6MgCRPTJggT0AAIE6AACBNgBgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AINgkTgyAJE8MgCRPzJggT8AAIE8AACBOABgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAgiCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AINgkTUyAJE4MgCRPTJggT0AAIE4AACBNQBgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCCIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAgiCRNTIAkToyAJE9MmCBPQAAgToAAIE1AINgkTUyAJE6MgCRPTJggT0AAIE6AACBNQBgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCCIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAgiCRNjIAkToyAJE9MmCBPQAAgToAAIE2AINgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCDYJE2MgCROjIAkT0yYIE9AACBOgAAgTYAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AINgkTgyAJE8MgCRPzJggT8AAIE8AACBOACDYJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAgiCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AINgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCDYJE1MgCRODIAkT0yYIE9AACBOAAAgTUAgiCRNTIAkToyAJE9MmCBPQAAgToAAIE1AINgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCDYJE1MgCROjIAkT0yYIE9AACBOgAAgTUAgiCRNjIAkToyAJE9MmCBPQAAgToAAIE2AINgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCDYJE2MgCROjIAkT0yYIE9AACBOgAAgTYAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AINgkTgyAJE8MgCRPzJggT8AAIE8AACBOACDYJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAgiCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AINgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCDYJE1MgCRODIAkT0yYIE9AACBOAAAgTUAgiCRNTIAkToyAJE9MmCBPQAAgToAAIE1AINgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCDYJE1MgCROjIAkT0yYIE9AACBOgAAgTUAgiCRNjIAkToyAJE6MgCRPTJggT0AAIE6AACBOgAAgTYAgiCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIUgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIUgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAgiCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AIUgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCCIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAgiCRNTIAkToyAJE9MmCBPQAAgToAAIE1AIUgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAgiCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIUgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIUgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAgiCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AIUgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCCIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAgiCRNTIAkToyAJE9MmCBPQAAgToAAIE1AIUgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAgiCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIUgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIUgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAgiCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AIUgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCCIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAgiCRNTIAkToyAJE9MmCBPQAAgToAAIE1AIUgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAgiCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIUgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIUgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAgiCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AIUgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCCIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAgiCRNTIAkToyAJE9MmCBPQAAgToAAIE1AIUgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAgiCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIUgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIUgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAgiCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AIUgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCCIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAgiCRNTIAkToyAJE9MmCBPQAAgToAAIE1AIUgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAgiCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIIgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIIgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIIgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCCIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAgiCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AIIgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCCIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAgiCRNTIAkToyAJE9MmCBPQAAgToAAIE1AIIgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCCIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAgiCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIIgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAgiCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIIgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIIgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE9MmCBPQCCIJE9MmCBPQCCIJE8MmCBPACCIJE8MmCBPACCIJE6MgCRPTJggT0AAIE6AIIgkToyAJE9MmCBPQAAgToAgiCROjIAkT0yAJFBMmCBQQAAgT0AAIE6AIIgkToyAJE9MgCRQTJggUEAAIE9AACBOgCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAg2CRNjIAkToyAJE9MmCBPQAAgToAAIE2AGCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIIgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAg2CRODIAkTwyAJE/MmCBPwAAgTwAAIE4AGCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIIgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAg2CRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AGCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AIIgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCCIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAg2CRNTIAkToyAJE9MmCBPQAAgToAAIE1AGCRNTIAkToyAJE9MmCBPQAAgToAAIE1AIIgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAg2CRNjIAkToyAJE9MmCBPQAAgToAAIE2AGCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIIgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAg2CRODIAkTwyAJE/MmCBPwAAgTwAAIE4AGCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIIgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAg2CRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AGCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AIIgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCCIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAg2CRNTIAkToyAJE9MmCBPQAAgToAAIE1AGCRNTIAkToyAJE9MmCBPQAAgToAAIE1AIIgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAg2CRNjIAkToyAJE9MmCBPQAAgToAAIE2AINgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAg2CRODIAkTwyAJE/MmCBPwAAgTwAAIE4AINgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAg2CRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AINgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCCIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAg2CRNTIAkToyAJE9MmCBPQAAgToAAIE1AINgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAg2CRNjIAkToyAJE9MmCBPQAAgToAAIE2AINgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAg2CRODIAkTwyAJE/MmCBPwAAgTwAAIE4AINgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAg2CRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AINgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCCIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAg2CRNTIAkToyAJE9MmCBPQAAgToAAIE1AINgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCCIJE2MgCROjIAkToyAJE9MmCBPQAAgToAAIE6AACBNgCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAhSCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIIgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAhSCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIIgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCCIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAhSCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AIIgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCCIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAhSCRNTIAkToyAJE9MmCBPQAAgToAAIE1AIIgkTYyAJE6MgCROjIAkT0yYIE9AACBOgAAgToAAIE2AIIgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCFIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIIgkTgyAJE8MgCRPzJggT8AAIE8AACBOACFIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAgiCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AIIgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCFIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAgiCRNTIAkToyAJE9MmCBPQAAgToAAIE1AIIgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCFIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAgiCRKjIAkTEyYIExAACBKgCCIJEqMgCRMTJggTEAAIEqAIUgkSoyAJExMmCBMQAAgSoAgiCRLDIAkTMyYIEzAACBLACCIJEsMgCRMzJggTMAAIEsAINgkToyYIE6AGCRPTIAkSwyAJEzMmCBMwAAgSwAAIE9AGCROjJggToAYJE9MgCRMTIAkTUyYIE1AACBMQAAgT0AYJE6MmCBOgBgkT0yAJExMgCRNTJggTUAAIExAACBPQCCIJE9MmCBPQBgkToyYIE6AGCRODIAkTEyAJE1MmCBNQAAgTEAAIE4AGCROjJggToAYJE1MgCRLjJggS4AAIE1AGCRMzJggTMAYJExMgCRLjJggS4AAIExAGCRMzJggTMAYJE1MmCBNQCCIJEzMgCRLjJggS4AAIEzAGCRMTJggTEAYJEqMgCRMTJggTEAAIEqAIIgkSoyAJExMmCBMQAAgSoAhSCRKjIAkTEyYIExAACBKgCCIJEsMgCRMzJggTMAAIEsAIIgkSwyAJEzMmCBMwAAgSwAhSCRLDIAkTMyYIEzAACBLACCIJExMgCRNTJggTUAAIExAIIgkTEyAJE1MmCBNQAAgTEAhSCRMTIAkTUyYIE1AACBMQCCIJEuMgCRMTIAkTUyYIE1AACBMQAAgS4AgiCRLjIAkTEyAJE1MmCBNQAAgTEAAIEuAIUgkS4yAJExMgCRNTJggTUAAIExAACBLgCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAgiCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIIgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIIgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIIgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCCIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAgiCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AIIgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCCIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAgiCRNTIAkToyAJE9MmCBPQAAgToAAIE1AIIgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCCIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAgiCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIIgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAgiCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIIgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIIgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE9MmCBPQCCIJE9MmCBPQCCIJE8MmCBPACCIJE8MmCBPACCIJE6MgCRPTJggT0AAIE6AIIgkToyAJE9MmCBPQAAgToAgiCROjIAkT0yAJFBMmCBQQAAgT0AAIE6AIIgkToyAJE9MgCRQTJggUEAAIE9AACBOgCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAg2CRNjIAkToyAJE9MmCBPQAAgToAAIE2AGCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIIgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAg2CRODIAkTwyAJE/MmCBPwAAgTwAAIE4AGCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIIgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAg2CRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AGCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AIIgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCCIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAg2CRNTIAkToyAJE9MmCBPQAAgToAAIE1AGCRNTIAkToyAJE9MmCBPQAAgToAAIE1AIIgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAg2CRNjIAkToyAJE9MmCBPQAAgToAAIE2AGCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIIgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAg2CRODIAkTwyAJE/MmCBPwAAgTwAAIE4AGCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIIgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAg2CRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AGCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AIIgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCCIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAg2CRNTIAkToyAJE9MmCBPQAAgToAAIE1AGCRNTIAkToyAJE9MmCBPQAAgToAAIE1AIIgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAg2CRNjIAkToyAJE9MmCBPQAAgToAAIE2AINgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAg2CRODIAkTwyAJE/MmCBPwAAgTwAAIE4AINgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAg2CRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AINgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCCIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAg2CRNTIAkToyAJE9MmCBPQAAgToAAIE1AINgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAg2CRNjIAkToyAJE9MmCBPQAAgToAAIE2AINgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAg2CRODIAkTwyAJE/MmCBPwAAgTwAAIE4AINgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAg2CRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AINgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCCIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAg2CRNTIAkToyAJE9MmCBPQAAgToAAIE1AINgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCCIJE2MgCROjIAkToyAJE9MmCBPQAAgToAAIE6AACBNgCCIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAhSCRNjIAkToyAJE9MmCBPQAAgToAAIE2AIIgkTgyAJE8MgCRPzJggT8AAIE8AACBOACCIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAhSCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIIgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCCIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAhSCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AIIgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCCIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAhSCRNTIAkToyAJE9MmCBPQAAgToAAIE1AIIgkTYyAJE6MgCROjIAkT0yYIE9AACBOgAAgToAAIE2AIIgkTYyAJE6MgCRPTJggT0AAIE6AACBNgCFIJE2MgCROjIAkT0yYIE9AACBOgAAgTYAgiCRODIAkTwyAJE/MmCBPwAAgTwAAIE4AIIgkTgyAJE8MgCRPzJggT8AAIE8AACBOACFIJE4MgCRPDIAkT8yYIE/AACBPAAAgTgAgiCRNTIAkTgyAJE9MmCBPQAAgTgAAIE1AIIgkTUyAJE4MgCRPTJggT0AAIE4AACBNQCFIJE1MgCRODIAkT0yYIE9AACBOAAAgTUAgiCRNTIAkToyAJE9MmCBPQAAgToAAIE1AIIgkTUyAJE6MgCRPTJggT0AAIE6AACBNQCFIJE1MgCROjIAkT0yYIE9AACBOgAAgTUAAP8vAA==";
+window.addEventListener('load', function(){
+  var bin=atob(BUNDLED_MIDI), bytes=new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+  loadMidi(bytes.buffer, 'Rude – Magic');
+});
+</script>
+</body>
+</html>
